@@ -8,17 +8,12 @@ namespace IMDB2025Inserter
 {
     public class Name
     {
-        public int Id { get; set; }
-         
+        public int Id { get; set; }         
         public string primaryName { get; set; }
-
         public int birthYear { get; set; }
         public int deathYear { get; set; }
-
         public List<string> primaryProfessions { get; set; }
-
         public List<int> knownForTitles { get; set; }
-
         public Name()
         {
             primaryProfessions = new List<string>();
