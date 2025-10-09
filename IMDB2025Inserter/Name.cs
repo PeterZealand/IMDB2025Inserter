@@ -10,8 +10,8 @@ namespace IMDB2025Inserter
     {
         public int Id { get; set; }         
         public string PrimaryName { get; set; }
-        public int BirthYear { get; set; }
-        public int DeathYear { get; set; }
+        public int? BirthYear { get; set; }
+        public int? DeathYear { get; set; }
         public List<string> PrimaryProfessions { get; set; }
         public List<int> KnownForTitles { get; set; }
         public Name()
