@@ -18,9 +18,9 @@ namespace IMDB2025Inserter
 
         public string Category { get; set; }
 
-        public string Job { get; set; }
+        public string? Job { get; set; }
 
-        public string Characters { get; set; }
+        public string? Characters { get; set; }
  
         public Principals() { }
 
