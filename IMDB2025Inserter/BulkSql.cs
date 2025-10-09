@@ -1,16 +1,10 @@
 ﻿using Microsoft.Data.SqlClient;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace IMDB2025Inserter
-{
-    public class BulkSql
-    {
+namespace IMDB2025Inserter {
+    public class BulkSql {
         public DataTable TitleDataTable { get; set; } 
+
         public BulkSql() {
             TitleDataTable = new DataTable();
             TitleDataTable.Columns.Add("Id", typeof(int));
@@ -18,16 +12,15 @@ namespace IMDB2025Inserter
             TitleDataTable.Columns.Add("PrimaryTitle", typeof(string));
             TitleDataTable.Columns.Add("OriginalTitle", typeof(string));
             TitleDataTable.Columns.Add("IsAdult", typeof(bool));
-            TitleDataTable.Columns.Add("StartYear", typeof(short));
-            TitleDataTable.Columns.Add("EndYear", typeof(short));
+            TitleDataTable.Columns.Add("StartYear", typeof(int));
+            TitleDataTable.Columns.Add("EndYear", typeof(int));
             TitleDataTable.Columns.Add("RuntimeMinutes", typeof(int));
         }
 
-        public void InsertTitle(Title title)
-        {
+        public void InsertTitle(Title title) {
             DataRow row = TitleDataTable.NewRow();
             row["Id"] = title.Id;
-            row["TypeId"] = title.TitleType;
+            row["TypeId"] = title.TypeId;
             row["PrimaryTitle"] = title.PrimaryTitle;
             row["OriginalTitle"] = (object?)title.OriginalTitle ?? DBNull.Value;
             row["IsAdult"] = title.IsAdult;
@@ -38,9 +31,7 @@ namespace IMDB2025Inserter
         }
 
         public void InsertIntoDB(SqlConnection sqlConn, SqlTransaction sqlTrans) {
-        
-            using (SqlBulkCopy bulkCopy = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls, sqlTrans))
-            {
+            using (SqlBulkCopy bulkCopy = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls, sqlTrans)) {
                 bulkCopy.DestinationTableName = "Titles";
                 bulkCopy.ColumnMappings.Add("Id", "Id");
                 bulkCopy.ColumnMappings.Add("TypeId", "TypeId");
@@ -55,3 +46,4 @@ namespace IMDB2025Inserter
         }
     }
 }
+
