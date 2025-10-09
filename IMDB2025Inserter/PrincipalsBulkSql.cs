@@ -46,7 +46,7 @@ namespace IMDB2025Inserter
                 bulkCopy.ColumnMappings.Add("Category", "Category");
                 bulkCopy.ColumnMappings.Add("Job", "Job");
                 bulkCopy.ColumnMappings.Add("Characters", "Characters");
-                bulkCopy.WriteToServer(princibleDataTable);
+                bulkCopy.WriteToServer(princibleDataTable); 
             }
         }
     }
