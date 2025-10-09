@@ -12,32 +12,28 @@ SqlConnection sqlConn = new SqlConnection(connectionString);
 sqlConn.Open();
 SqlTransaction sqlTrans = sqlConn.BeginTransaction();
 
-//SqlCommand cmd = new SqlCommand("SET IDENTITY_INSERT Titles ON;", sqlConn, sqlTrans);
-//cmd.ExecuteNonQuery();
+SqlCommand cmd = new SqlCommand("SET IDENTITY_INSERT Titles ON;", sqlConn, sqlTrans);
+cmd.ExecuteNonQuery();
 
-//PreparedSql preparedSql = new PreparedSql(sqlConn, sqlTrans);
 BulkSql bulkSql = new BulkSql();
 
 Dictionary<string, int> TitleTypes = new Dictionary<string, int>();
 
-string filename = "c:/temp/title.basics.tsv";
-IEnumerable<string> imdbData = File.ReadAllLines(filename).Skip(1).Take(10000);
-foreach (string titleString in imdbData)
-{
+string filename = "C:\\Users\\mstac\\Downloads\\title.basics.tsv\\title.basics.tsv";
+IEnumerable<string> imdbData = File.ReadAllLines(filename).Skip(1).Take(10);
+
+foreach (string titleString in imdbData) {
     string[] values = titleString.Split('\t');
-    if (values.Length == 9)
-    {
-        if (!TitleTypes.ContainsKey(values[1]))
-        {
+
+    if (values.Length == 9) {
+        if (!TitleTypes.ContainsKey(values[1])) {
             AddTitleType(values[1], sqlConn, sqlTrans, TitleTypes);
         }
 
-        try
-        {
-            Title title = new Title
-            {
+        try {
+            Title title = new Title {
                 Id = int.Parse(values[0].Substring(2)),
-                TitleType = TitleTypes[values[1]],
+                TypeId = TitleTypes[values[1]],
                 PrimaryTitle = values[2],
                 OriginalTitle = values[3] == "\\N" ? null : values[3],
                 IsAdult = values[4] == "1",
@@ -47,31 +43,23 @@ foreach (string titleString in imdbData)
                 Genres = values[8] == "\\N" ? new List<string>() : values[8].Split(',').ToList()
             };
 
-            //SqlCommand sqlComm = new SqlCommand(title.ToSQL(), sqlConn, sqlTrans);
-            //sqlComm.ExecuteNonQuery();
-
-            //preparedSql.InsertTitle(title);
+            SqlCommand sqlComm = new SqlCommand(title.ToSQL(), sqlConn, sqlTrans);
+            sqlComm.ExecuteNonQuery();
 
             bulkSql.InsertTitle(title);
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             Console.WriteLine("Error parsing line: " + titleString);
             Console.WriteLine(ex.Message);
         }
     }
-    else
-    {
+    else {
         Console.WriteLine("Not 9 values: " + titleString);
     }
 }
 Console.WriteLine("Millisekunder: " + sw.ElapsedMilliseconds);
 
 sw.Restart();
-
-SqlCommand cmd = new SqlCommand("SET IDENTITY_INSERT Titles ON;", sqlConn, sqlTrans);
-cmd.ExecuteNonQuery();
-bulkSql.InsertIntoDB(sqlConn, sqlTrans);
 
 cmd = new SqlCommand("SET IDENTITY_INSERT Titles OFF;", sqlConn, sqlTrans);
 cmd.ExecuteNonQuery();
@@ -83,12 +71,10 @@ Console.WriteLine("Millisekunder: " + sw.ElapsedMilliseconds);
 Console.WriteLine("Alle records: " + 1200 * sw.ElapsedMilliseconds);
 Console.WriteLine("Alle records i timer: " + (1200.0 * sw.ElapsedMilliseconds)/1000.0/60.0/60.0);
 
-void AddTitleType(string titleType, SqlConnection sqlConn, SqlTransaction sqlTrans, Dictionary<string, int> TitleTypes)
-{
-    if (!TitleTypes.ContainsKey(titleType))
-    {
+void AddTitleType(string titleType, SqlConnection sqlConn, SqlTransaction sqlTrans, Dictionary<string, int> TitleTypes) {
+    if (!TitleTypes.ContainsKey(titleType)) {
         SqlCommand sqlComm = new SqlCommand(
-            "INSERT INTO TitleTypes (Type) VALUES ('" + titleType + "'); " +
+            "INSERT INTO TitleTypes (TypeName) VALUES ('" + titleType + "'); " +
             "SELECT SCOPE_IDENTITY();", sqlConn, sqlTrans);
         int newId = Convert.ToInt32(sqlComm.ExecuteScalar());
         TitleTypes[titleType] = newId;
