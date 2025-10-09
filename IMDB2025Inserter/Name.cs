@@ -9,15 +9,15 @@ namespace IMDB2025Inserter
     public class Name
     {
         public int Id { get; set; }         
-        public string primaryName { get; set; }
-        public int birthYear { get; set; }
-        public int deathYear { get; set; }
-        public List<string> primaryProfessions { get; set; }
-        public List<int> knownForTitles { get; set; }
+        public string PrimaryName { get; set; }
+        public int BirthYear { get; set; }
+        public int DeathYear { get; set; }
+        public List<string> PrimaryProfessions { get; set; }
+        public List<int> KnownForTitles { get; set; }
         public Name()
         {
-            primaryProfessions = new List<string>();
-            knownForTitles = new List<int>();
+            PrimaryProfessions = new List<string>();
+            KnownForTitles = new List<int>();
         }
 
         public string ToSQL()
@@ -25,12 +25,12 @@ namespace IMDB2025Inserter
             StringBuilder sb = new StringBuilder();
             sb.Append($"INSERT INTO Names (Id, PrimaryName, BirthYear, DeathYear) VALUES (");
             sb.Append($"{Id}, ");
-            sb.Append($"'{primaryName.Replace("'", "''")}', ");
-            sb.Append(birthYear != 0 ? $"{birthYear}, " : "NULL, ");
-            sb.Append(deathYear != 0 ? $"{deathYear}" : "NULL");
+            sb.Append($"'{PrimaryName.Replace("'", "''")}', ");
+            sb.Append(BirthYear != 0 ? $"{BirthYear}, " : "NULL, ");
+            sb.Append(DeathYear != 0 ? $"{DeathYear}" : "NULL");
             sb.Append(");");
             //foreach (string profession in primaryProfessions)
-            //{
+            //{ 
             //    sb.AppendLine();
             //    sb.Append($"INSERT INTO NameProfessions (NameId, Profession) VALUES ({Id}, '{profession.Replace("'", "''")}');");
             //}
