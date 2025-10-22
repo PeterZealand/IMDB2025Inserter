@@ -29,7 +29,7 @@ namespace IMDB2025Inserter
             row["DeathYear"] = (object?)name.DeathYear ?? DBNull.Value;
             NameDataTable.Rows.Add(row);
         }
-
+         
         public void InsertIntoDB(SqlConnection sqlConn, SqlTransaction sqlTrans)
         {
             using (SqlBulkCopy bulkCopy = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls, sqlTrans))
