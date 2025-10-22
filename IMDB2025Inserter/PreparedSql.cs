@@ -44,7 +44,7 @@ namespace IMDB2025Inserter
         public void InsertTitle(Title title)
         {
             Sql.Parameters["@Id"].Value = title.Id;
-            Sql.Parameters["@TitleType"].Value = title.TitleType;
+            Sql.Parameters["@TitleType"].Value = title.TypeId;
             Sql.Parameters["@PrimaryTitle"].Value = title.PrimaryTitle;
             Sql.Parameters["@OriginalTitle"].Value = (object?)title.OriginalTitle ?? DBNull.Value;
             Sql.Parameters["@IsAdult"].Value = title.IsAdult;

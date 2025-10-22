@@ -3,7 +3,7 @@ using Microsoft.Data.SqlClient;
 using System.Diagnostics;
 
 string connectionString = "Server=localhost;Database=IMDB;integrated security=True;TrustServerCertificate=True;";
-string filename = "C:\\temp\\title.basics.tsv\\title.basics.tsv";
+string filename = "C:\\Users\\jaish\\Desktop\\Dat\\4Semester\\SQL\\title.basics.tsv";
 
 using var sqlConn = new SqlConnection(connectionString);
 sqlConn.Open();
