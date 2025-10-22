@@ -1,82 +1,103 @@
-﻿using IMDB2025Inserter;
+using IMDB2025Inserter;
 using Microsoft.Data.SqlClient;
 using System.Diagnostics;
 
-string connectionString = "Server=localhost;Database=IMDB;" +
-    "integrated security=True;TrustServerCertificate=True;";
+string connectionString = "Server=localhost;Database=IMDB;integrated security=True;TrustServerCertificate=True;";
+string filename = "C:\\temp\\title.basics.tsv\\title.basics.tsv";
 
-Stopwatch sw = new Stopwatch();
-sw.Start();
-
-SqlConnection sqlConn = new SqlConnection(connectionString);
+using var sqlConn = new SqlConnection(connectionString);
 sqlConn.Open();
-SqlTransaction sqlTrans = sqlConn.BeginTransaction();
 
+SqlTransaction sqlTrans = sqlConn.BeginTransaction();
 SqlCommand cmd = new SqlCommand("SET IDENTITY_INSERT Titles ON;", sqlConn, sqlTrans);
 cmd.ExecuteNonQuery();
 
-BulkSql bulkSql = new BulkSql();
+BulkSql bulkSql = new();
+Dictionary<string, int> TitleTypes = new();
+Dictionary<string, int> TitleGenres = new();
 
-Dictionary<string, int> TitleTypes = new Dictionary<string, int>();
+Stopwatch sw = Stopwatch.StartNew();
 
-string filename = "C:\\Users\\mstac\\Downloads\\title.basics.tsv\\title.basics.tsv";
-IEnumerable<string> imdbData = File.ReadAllLines(filename).Skip(1).Take(10);
+int batchSize = 25000;
+int count = 0;
 
-foreach (string titleString in imdbData) {
-    string[] values = titleString.Split('\t');
+foreach (string line in File.ReadLines(filename).Skip(1)){
+    string[] values = line.Split('\t');
+    if (values.Length != 9) continue;
 
-    if (values.Length == 9) {
-        if (!TitleTypes.ContainsKey(values[1])) {
-            AddTitleType(values[1], sqlConn, sqlTrans, TitleTypes);
-        }
+    if (!TitleTypes.ContainsKey(values[1]))
+        AddTitleType(values[1], sqlConn, sqlTrans, TitleTypes);
 
-        try {
-            Title title = new Title {
-                Id = int.Parse(values[0].Substring(2)),
-                TypeId = TitleTypes[values[1]],
-                PrimaryTitle = values[2],
-                OriginalTitle = values[3] == "\\N" ? null : values[3],
-                IsAdult = values[4] == "1",
-                StartYear = values[5] == "\\N" ? null : int.Parse(values[5]),
-                EndYear = values[6] == "\\N" ? null : int.Parse(values[6]),
-                RuntimeMinutes = values[7] == "\\N" ? null : int.Parse(values[7]),
-                Genres = values[8] == "\\N" ? new List<string>() : values[8].Split(',').ToList()
-            };
+    Title title = new Title {
+        Id = int.Parse(values[0][2..]),
+        TypeId = TitleTypes[values[1]],
+        PrimaryTitle = values[2],
+        OriginalTitle = values[3] == "\\N" ? null : values[3],
+        IsAdult = values[4] == "1",
+        StartYear = values[5] == "\\N" ? null : int.Parse(values[5]),
+        EndYear = values[6] == "\\N" ? null : int.Parse(values[6]),
+        RuntimeMinutes = values[7] == "\\N" ? null : int.Parse(values[7])
+    };
 
-            SqlCommand sqlComm = new SqlCommand(title.ToSQL(), sqlConn, sqlTrans);
-            sqlComm.ExecuteNonQuery();
+    if(values[8] != "\\N"){
+        string[] genres = values[8].Split(",");
 
-            bulkSql.InsertTitle(title);
-        }
-        catch (Exception ex) {
-            Console.WriteLine("Error parsing line: " + titleString);
-            Console.WriteLine(ex.Message);
+        foreach(string ge in genres){
+            string genre = ge.Trim();
+            if(genre.Length == 0) continue;
+
+            if(!TitleGenres.ContainsKey(genre)){
+                AddTitleGenre(genre, sqlConn, sqlTrans, TitleGenres);
+            }
+
+            title.Genres.Add(genre);
         }
     }
-    else {
-        Console.WriteLine("Not 9 values: " + titleString);
+
+    bulkSql.InsertTitle(title);
+    count++;
+
+    if (count % batchSize == 0) {
+        bulkSql.InsertIntoDB(sqlConn, sqlTrans);
+        bulkSql.TitleDataTable.Clear();
+        sqlTrans.Rollback();
+        sqlTrans = sqlConn.BeginTransaction();
+        Console.WriteLine($"{count:N0} titles inserted...");
     }
 }
-Console.WriteLine("Millisekunder: " + sw.ElapsedMilliseconds);
 
-sw.Restart();
+// Final batch
+if (bulkSql.TitleDataTable.Rows.Count > 0) {
+    bulkSql.InsertIntoDB(sqlConn, sqlTrans);
+    sqlTrans.Rollback();
+    sqlTrans.Dispose();
+}
 
-cmd = new SqlCommand("SET IDENTITY_INSERT Titles OFF;", sqlConn, sqlTrans);
+cmd = new SqlCommand("SET IDENTITY_INSERT Titles OFF;", sqlConn,sqlTrans);
 cmd.ExecuteNonQuery();
-sqlTrans.Rollback();
 sqlConn.Close();
 
-sw.Stop();
-Console.WriteLine("Millisekunder: " + sw.ElapsedMilliseconds);
-Console.WriteLine("Alle records: " + 1200 * sw.ElapsedMilliseconds);
-Console.WriteLine("Alle records i timer: " + (1200.0 * sw.ElapsedMilliseconds)/1000.0/60.0/60.0);
+Console.WriteLine($"Done. Inserted {count:N0} titles in {sw.Elapsed.TotalMinutes:F2} minutes.");
 
-void AddTitleType(string titleType, SqlConnection sqlConn, SqlTransaction sqlTrans, Dictionary<string, int> TitleTypes) {
-    if (!TitleTypes.ContainsKey(titleType)) {
-        SqlCommand sqlComm = new SqlCommand(
-            "INSERT INTO TitleTypes (TypeName) VALUES ('" + titleType + "'); " +
-            "SELECT SCOPE_IDENTITY();", sqlConn, sqlTrans);
-        int newId = Convert.ToInt32(sqlComm.ExecuteScalar());
-        TitleTypes[titleType] = newId;
+void AddTitleType(string titleType, SqlConnection conn, SqlTransaction trans, Dictionary<string, int> cache) {
+    SqlCommand sqlComm = new("INSERT INTO TitleTypes (TypeName) VALUES (@name); SELECT SCOPE_IDENTITY();", conn, trans);
+    sqlComm.Parameters.AddWithValue("@name", titleType);
+    int newId = Convert.ToInt32(sqlComm.ExecuteScalar());
+    cache[titleType] = newId;
+}
+
+void AddTitleGenre(string genre, SqlConnection conn, SqlTransaction trans, Dictionary<string, int> cache) {
+    SqlCommand sqlComm = new("select id from genres where genre = @genre", conn,trans);
+    sqlComm.Parameters.AddWithValue("@genre",genre);
+    int result = Convert.ToInt32(sqlComm.ExecuteScalar());
+
+    if(result != 0){
+        cache[genre] = result;
+        return;
     }
+
+    sqlComm = new("insert into genres (genre) values (@genre); select SCOPE_IDENTITY();",conn,trans);
+    sqlComm.Parameters.AddWithValue("@genre", genre);
+    int newId = Convert.ToInt32(sqlComm.ExecuteScalar());
+    cache[genre] = newId;
 }
