@@ -6,6 +6,7 @@ string connectionString = "Server=localhost;Database=IMDB;integrated security=Tr
 string titlesFile = "C:\\temp\\title.basics.tsv";
 string namesFile = "C:\\temp\\name.basics.tsv";
 string principalsFile = "C:\\temp\\title.Principals.tsv";
+string crewFile = "C:\\temp\\title.Crew.tsv";
 
 using var sqlConn = new SqlConnection(connectionString);
 sqlConn.Open();
@@ -15,6 +16,8 @@ SqlCommand cmd = new SqlCommand("SET IDENTITY_INSERT Titles ON;", sqlConn, sqlTr
 cmd.ExecuteNonQuery();
 
 BulkSql bulkSql = new();
+TitleTypeBulkSql titleGenreBulkSql = new();
+CrewBulkSql crewBulkSql = new();
 PrincipalsBulkSql principalsBulkSql = new();
 NameBulkSqL namesSql = new();
 
@@ -29,28 +32,77 @@ Dictionary<string,int> NamesKnownForNames = new();
 
 Stopwatch sw = Stopwatch.StartNew();
 
-int batchSize = 25000;
+int batchSize = 30000;
 int count = 0;
 
 // Title();
-Principals();
+// Principals();
 
 cmd = new SqlCommand("SET IDENTITY_INSERT Titles OFF;", sqlConn,sqlTrans);
 cmd.ExecuteNonQuery();
 
-Names();
+// Names();
+Crews();
 
 sqlConn.Close();
 
 Console.WriteLine($"Done. Inserted {count:N0} titles in {sw.Elapsed.TotalMinutes:F2} minutes.");
 
+void Crews(){
+    foreach(string line in File.ReadLines(crewFile).Skip(1)){
+        string[] values = line.Split("\t");
+        if(values.Length != 3) continue;
+
+        string[] directors = values[1].Split(",");
+        string[] writers = values[2].Split(",");
+        Crew crew = new();
+        int titleId = Int32.Parse(values[0][2..]);
+        crew.TitleId = titleId;
+
+        if(directors.Length > 0){
+            foreach(string s in directors){
+                if (s != "\\N")
+                    crew.Directors.Add(s[2..]);
+            }
+            crewBulkSql.InsertCrewDirectors(crew);
+        }
+
+        if(writers.Length > 0){
+            foreach(string s in writers){
+                if (s != "\\N")
+                    crew.Writers.Add(s[2..]);
+            }
+            crewBulkSql.InsertCrewWriters(crew);
+        }
+
+        count++;
+
+        if(count % batchSize == 0){
+            crewBulkSql.InsertIntoDBDirectors(sqlConn,sqlTrans);
+            crewBulkSql.InsertIntoDBWriters(sqlConn,sqlTrans);
+            crewBulkSql.CrewDataTableDirectors.Clear();
+            crewBulkSql.CrewDataTableWriters.Clear();
+            sqlTrans.Commit();
+            sqlTrans = sqlConn.BeginTransaction();
+            Console.WriteLine($"{count:N0} directors and writers inserted..");
+        }
+    }
+
+    if(crewBulkSql.CrewDataTableDirectors.Rows.Count > 0){
+        crewBulkSql.InsertIntoDBDirectors(sqlConn,sqlTrans);
+    }
+    if(crewBulkSql.CrewDataTableWriters.Rows.Count > 0){
+        crewBulkSql.InsertIntoDBWriters(sqlConn,sqlTrans);
+    }
+
+    sqlTrans.Commit();
+    sqlTrans.Dispose();
+}
+
 void Names(){
     foreach(string line in File.ReadLines(namesFile).Skip(1)){
         string[] values = line.Split("\t");
         if(values.Length != 6) continue;
-        // foreach(string s in values){
-        //     Console.WriteLine(s);
-        // }
 
         Name name = new(){
             Id = Int32.Parse(values[0][2..]),
@@ -60,37 +112,46 @@ void Names(){
         };
 
         namesSql.InsertName(name);
-        count++;
 
         if(values[4] != "\\N"){
             string[] primaryProfessions = values[4].Split(",");
 
             foreach(string pro in primaryProfessions){
-                string profession = pro.Trim();
-                if(profession.Length == 0) continue;
-
-                if(!NamesPrimaryProfessions.ContainsKey(profession)){
-                    AddPrimaryProfessions(profession, sqlConn, sqlTrans, NamesPrimaryProfessions);
+                if(!NamesPrimaryProfessions.ContainsKey(pro)){
+                    AddProfession(pro,sqlConn,sqlTrans,NamesPrimaryProfessions);
                 }
-
-                name.PrimaryProfessions.Add(pro);
+                if(!name.PrimaryProfessions.Contains(pro)){
+                    name.PrimaryProfessions.Add(pro);
+                }
             }
+
+            namesSql.InsertNamesProfessions(name,sqlConn,sqlTrans);
+            namesSql.InsertProfessions(name);
         }
 
         if(values[5] != "\\N"){
             string[] knownForSplit = values[5].Split(",");
 
-            foreach(string s in knownForSplit){
-                if(!NamesKnownForTitles.ContainsKey(s)){
-                    AddKnownForNames(values[0][2..],s[2..],sqlConn,sqlTrans, NamesKnownForNames,NamesKnownForTitles);
-                }
+            foreach(string knownFor in knownForSplit){
+                if(knownFor != "\\N")
+                    name.KnownForTitles.Add(knownFor);
             }
+
+            namesSql.InsertKnownFor(name);
         }
 
+        count++;
+
         if (count % batchSize == 0) {
-            namesSql.InsertIntoDB(sqlConn, sqlTrans);
+            namesSql.InsertNameIntoDB(sqlConn, sqlTrans);
+            namesSql.InsertIntoDBProfessions(sqlConn,sqlTrans);
+            namesSql.InsertIntoDBKnownFor(sqlConn,sqlTrans);
+            namesSql.InsertIntoDBNamesProfessions(sqlConn,sqlTrans);
             namesSql.NameDataTable.Clear();
-            sqlTrans.Rollback();
+            namesSql.ProfessionsTable.Clear();
+            namesSql.NameKnownForTable.Clear();
+            namesSql.NamePrimaryProfessions.Clear();
+            sqlTrans.Commit();
             sqlTrans = sqlConn.BeginTransaction();
             Console.WriteLine($"{count:N0} names inserted...");
         }
@@ -98,10 +159,20 @@ void Names(){
 
     // Final batch
     if (namesSql.NameDataTable.Rows.Count > 0) {
-        namesSql.InsertIntoDB(sqlConn, sqlTrans);
-        sqlTrans.Rollback();
-        sqlTrans.Dispose();
+        namesSql.InsertNameIntoDB(sqlConn, sqlTrans);
     }
+    if(namesSql.NameKnownForTable.Rows.Count > 0){
+        namesSql.InsertIntoDBKnownFor(sqlConn, sqlTrans);
+    }
+    if(namesSql.ProfessionsTable.Rows.Count > 0){
+        namesSql.InsertIntoDBProfessions(sqlConn, sqlTrans);
+    }
+    if(namesSql.NamePrimaryProfessions.Rows.Count > 0){
+        namesSql.InsertIntoDBNamesProfessions(sqlConn,sqlTrans);
+    }
+
+    sqlTrans.Commit();
+    sqlTrans.Dispose();
 }
 
 void Principals(){
@@ -124,7 +195,7 @@ void Principals(){
         if (count % batchSize == 0) {
             principalsBulkSql.InsertIntoDB(sqlConn, sqlTrans);
             principalsBulkSql.princibleDataTable.Clear();
-            sqlTrans.Rollback();
+            sqlTrans.Commit();
             sqlTrans = sqlConn.BeginTransaction();
             Console.WriteLine($"{count:N0} principals inserted...");
         }
@@ -133,7 +204,7 @@ void Principals(){
     // Final batch
     if (principalsBulkSql.princibleDataTable.Rows.Count > 0) {
         principalsBulkSql.InsertIntoDB(sqlConn, sqlTrans);
-        sqlTrans.Rollback();
+        sqlTrans.Commit();
         sqlTrans.Dispose();
     }
 }
@@ -165,20 +236,25 @@ void Title(){
                 if(genre.Length == 0) continue;
 
                 if(!TitleGenres.ContainsKey(genre)){
-                    AddTitleGenre(genre, sqlConn, sqlTrans, TitleGenres);
+                    InsertGenre(genre, sqlConn, sqlTrans, TitleGenres);
                 }
 
-                title.Genres.Add(genre);
+                if(!title.Genres.Contains(genre)){
+                    title.Genres.Add(genre);
+                }
             }
         }
 
+        titleGenreBulkSql.InsertTitleGenre(title,sqlConn,sqlTrans);
         bulkSql.InsertTitle(title);
         count++;
 
         if (count % batchSize == 0) {
             bulkSql.InsertIntoDB(sqlConn, sqlTrans);
+            titleGenreBulkSql.InsertIntoDB(sqlConn,sqlTrans);
             bulkSql.TitleDataTable.Clear();
-            sqlTrans.Rollback();
+            titleGenreBulkSql.TitleGenreDataTable.Clear();
+            sqlTrans.Commit();
             sqlTrans = sqlConn.BeginTransaction();
             Console.WriteLine($"{count:N0} titles inserted...");
         }
@@ -187,9 +263,17 @@ void Title(){
     // Final batch
     if (bulkSql.TitleDataTable.Rows.Count > 0) {
         bulkSql.InsertIntoDB(sqlConn, sqlTrans);
-        sqlTrans.Rollback();
+        titleGenreBulkSql.InsertIntoDB(sqlConn,sqlTrans);
+        sqlTrans.Commit();
         sqlTrans.Dispose();
     }
+}
+
+void AddProfession(string profession, SqlConnection conn, SqlTransaction trans, Dictionary<string,int> cache){
+    SqlCommand sqlComm = new("INSERT INTO professions (Profession) VALUES (@profession);", conn, trans);
+    sqlComm.Parameters.AddWithValue("@profession", profession);
+    int newId = Convert.ToInt32(sqlComm.ExecuteScalar());
+    cache[profession] = newId;
 }
 
 void AddTitleType(string titleType, SqlConnection conn, SqlTransaction trans, Dictionary<string, int> cache) {
@@ -199,7 +283,7 @@ void AddTitleType(string titleType, SqlConnection conn, SqlTransaction trans, Di
     cache[titleType] = newId;
 }
 
-void AddTitleGenre(string genre, SqlConnection conn, SqlTransaction trans, Dictionary<string, int> cache) {
+void InsertGenre(string genre, SqlConnection conn, SqlTransaction trans, Dictionary<string, int> cache) {
     SqlCommand sqlComm = new("select id from genres where genre = @genre", conn,trans);
     sqlComm.Parameters.AddWithValue("@genre",genre);
     int result = Convert.ToInt32(sqlComm.ExecuteScalar());

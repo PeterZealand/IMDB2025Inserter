@@ -3,8 +3,8 @@ using System.Text;
 
 namespace IMDB2025Inserter {
     public class Title {
-        string connectionString = "Server=localhost;Database=IMDB;" +
-            "integrated security=True;TrustServerCertificate=True;";
+        // string connectionString = "Server=localhost;Database=IMDB;" +
+        //     "integrated security=True;TrustServerCertificate=True;";
         public int Id { get; set; }
         public int TypeId { get; set; }
         public string? PrimaryTitle { get; set; }
@@ -19,11 +19,11 @@ namespace IMDB2025Inserter {
             Genres = new List<string>();
         }
 
-        public string ToSQL() {
-            SqlConnection sqlConn = new SqlConnection(connectionString);
-            sqlConn.Open();
-
-            SqlTransaction sqlTrans = sqlConn.BeginTransaction();
+        public string ToSQL(SqlConnection sqlConn, SqlTransaction sqlTrans) {
+            // SqlConnection sqlConn = new SqlConnection(connectionString);
+            // sqlConn.Open();
+            //
+            // SqlTransaction sqlTrans = sqlConn.BeginTransaction();
             StringBuilder sb = new StringBuilder();
 
             int? genreId = 0;

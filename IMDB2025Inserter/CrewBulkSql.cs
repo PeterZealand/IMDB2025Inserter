@@ -1,34 +1,64 @@
 ﻿using Microsoft.Data.SqlClient;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace IMDB2025Inserter
-{
-    public class CrewBulkSql
-    {
-        public DataTable CrewDataTable { get; set; }
-        public CrewBulkSql()
-        {
-            CrewDataTable = new DataTable();
-            CrewDataTable.Columns.Add("Id", typeof(int));
+namespace IMDB2025Inserter {
+    public class CrewBulkSql {
+        public DataTable CrewDataTableDirectors { get; set; }
+        public DataTable CrewDataTableWriters { get; set; }
+
+        public CrewBulkSql() {
+            CrewDataTableDirectors = new();
+            CrewDataTableWriters = new DataTable();
+
+            CrewDataTableDirectors.Columns.Add("TitleId",typeof(int));
+            CrewDataTableDirectors.Columns.Add("NameId",typeof(int));
+
+            CrewDataTableWriters.Columns.Add("TitleId", typeof(int));
+            CrewDataTableWriters.Columns.Add("NameId", typeof(int));
+
         }
-        public void InsertCrew(Crew crew)
-        {
-            DataRow row = CrewDataTable.NewRow();
-            row["Id"] = crew.Id;
-            CrewDataTable.Rows.Add(row);
+
+        public void InsertCrewDirectors(Crew crew) {
+            DataRow? row = null;
+
+            foreach(string s in crew.Directors){
+                int nameId = Int32.Parse(s);
+
+                row = CrewDataTableDirectors.NewRow();
+                row["TitleId"] = crew.TitleId;
+                row["NameId"] = nameId;
+                CrewDataTableDirectors.Rows.Add(row);
+            }
         }
-        public void InsertIntoDB(SqlConnection sqlConn, SqlTransaction sqlTrans)
-        {
-            using (SqlBulkCopy bulkCopy = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls, sqlTrans))
-            {
-                bulkCopy.DestinationTableName = "Crews";
-                bulkCopy.ColumnMappings.Add("Id", "Id");
-                bulkCopy.WriteToServer(CrewDataTable);
+
+        public void InsertCrewWriters(Crew crew) {
+            DataRow? row = null;
+
+            foreach(string s in crew.Writers){
+                int nameId = Int32.Parse(s);
+
+                row = CrewDataTableWriters.NewRow();
+                row["TitleId"] = crew.TitleId;
+                row["NameId"] = nameId;
+                CrewDataTableWriters.Rows.Add(row);
+            }
+        }
+
+        public void InsertIntoDBDirectors(SqlConnection sqlConn, SqlTransaction sqlTrans) {
+            using (SqlBulkCopy bulkCopy = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls, sqlTrans)) {
+                bulkCopy.DestinationTableName = "CrewDirector";
+                bulkCopy.ColumnMappings.Add("TitleId", "TitleId");
+                bulkCopy.ColumnMappings.Add("NameId", "NameId");
+                bulkCopy.WriteToServer(CrewDataTableDirectors);
+            }
+        }
+
+        public void InsertIntoDBWriters(SqlConnection sqlConn, SqlTransaction sqlTrans) {
+            using (SqlBulkCopy bulkCopy = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls, sqlTrans)) {
+                bulkCopy.DestinationTableName = "CrewWriter";
+                bulkCopy.ColumnMappings.Add("TitleId", "TitleId");
+                bulkCopy.ColumnMappings.Add("NameId", "NameId");
+                bulkCopy.WriteToServer(CrewDataTableWriters);
             }
         }
     }
