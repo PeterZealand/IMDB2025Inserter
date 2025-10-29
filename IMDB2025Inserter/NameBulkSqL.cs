@@ -26,7 +26,7 @@ namespace IMDB2025Inserter {
             NameKnownForTable.Columns.Add("NameId",typeof(int));
             NameKnownForTable.Columns.Add("TitleId",typeof(int));
 
-            ProfessionsTable.Columns.Add("Professions",typeof(string));
+            ProfessionsTable.Columns.Add("Profession",typeof(string));
         }
 
         public void InsertName(Name name) {
@@ -43,7 +43,7 @@ namespace IMDB2025Inserter {
 
             foreach(string profession in name.PrimaryProfessions){
                 row = ProfessionsTable.NewRow();
-                row["Professions"] = profession;
+                row["Profession"] = profession;
                 ProfessionsTable.Rows.Add(row);
             }
         }
@@ -86,7 +86,7 @@ namespace IMDB2025Inserter {
         public void InsertIntoDBProfessions(SqlConnection sqlConn, SqlTransaction sqlTrans) {
             using (SqlBulkCopy bulkCopy = new SqlBulkCopy(sqlConn, SqlBulkCopyOptions.KeepIdentity | SqlBulkCopyOptions.KeepNulls, sqlTrans)) {
                 bulkCopy.DestinationTableName = "Professions";
-                bulkCopy.ColumnMappings.Add("Professions","Professions");
+                bulkCopy.ColumnMappings.Add("Profession","Profession");
                 bulkCopy.WriteToServer(ProfessionsTable);
             }
         }
