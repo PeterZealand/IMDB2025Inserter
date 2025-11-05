@@ -217,7 +217,7 @@ void Title(){
         if (!TitleTypes.ContainsKey(values[1]))
             AddTitleType(values[1], sqlConn, sqlTrans, TitleTypes);
 
-        Title title = new Title {
+        Title title = new Title(0,0,"","",false,0,0,0,new List<string>()){
             Id = int.Parse(values[0][2..]),
             TypeId = TitleTypes[values[1]],
             PrimaryTitle = values[2],
